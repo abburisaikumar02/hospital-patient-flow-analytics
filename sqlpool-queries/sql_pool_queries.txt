@@ -1,0 +1,69 @@
+CREATE MASTER KEY ENCRYPTION BY PASSWORD = '<<password>>';
+--CREATING A SCOPE 
+CREATE DATABASE SCOPED CREDENTIAL storage_credential
+WITH IDENTITY = 'Managed Identity';
+
+--define the gold data source
+CREATE EXTERNAL DATA SOURCE gold_data_source
+WITH (
+    TYPE = HADOOP,
+    LOCATION = 'abfss://container@storage.dfs.core.windows.net/',
+    CREDENTIAL = storage_credential
+
+)
+
+--define the format 
+CREATE EXTERNAL FILE FORMAT ParquetFileFormat
+WITH (
+    FORMAT_TYPE = PARQUET
+);
+
+--CREATE TABLES 
+--PATIENT DIMENSION TABLE
+CREATE EXTERNAL TABLE dbo.dim_patient(
+    patient_id VARCHAR(50),
+    gender VARCHAR(50),
+    age Int,
+    effective_from DATETIME2,
+    surrogate_key BIGINT,
+    effective_to DATETIME2,
+    is_current BIT
+)
+WITH (
+    LOCATION ='dim_patient/',
+    DATA_SOURCE = gold_data_source,
+    FILE_FORMAT = ParquetFileFormat
+);
+
+-- Department dimension table
+CREATE EXTERNAL TABLE dbo.dim_departments(
+    department VARCHAR(200),
+    hospital_id INT,
+    surrogate_key BIGINT
+)
+WITH (
+    LOCATION ='dim_departments/',
+    DATA_SOURCE = gold_data_source,
+    FILE_FORMAT = ParquetFileFormat
+);
+
+--- fact table
+CREATE EXTERNAL TABLE dbo.fact_patient_flow(
+    fact_id BIGINT,
+    patient_sk BIGINT,
+    department_sk BIGINT,
+    admission_time DATETIME2,
+    discharge_time DATETIME2,
+    admission_date DATE,
+    length_of_stay_hours FLOAT,
+    is_currently_admitted BIT,
+    bed_id INT,
+    event_ingestion_time DATETIME2
+)
+WITH (
+    LOCATION ='fact_patient_flow/',
+    DATA_SOURCE = gold_data_source,
+    FILE_FORMAT = ParquetFileFormat
+);
+
+SELECT * FROM dbo.fact_patient_flow
